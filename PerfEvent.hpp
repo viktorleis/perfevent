@@ -154,15 +154,11 @@ struct PerfEvent {
          return;
       std::streamsize defaultPrecision = out.precision();
 
-      // print duration
-      out << std::fixed << std::setprecision(6);
-      out << getDuration() << " s execution";
-
       // print all metrics
       out << std::fixed << std::setprecision(2);
       for (unsigned i=0; i<events.size(); i++)
-         out << ", " << events[i].readCounter()/normalizationConstant << " " << names[i];
-      out << ", " << normalizationConstant << " scale";
+         out << events[i].readCounter()/normalizationConstant << " " << names[i] << ", ";
+      out << normalizationConstant << " scale";
 
       // derived metrics
       out << ", " << getIPC() << " IPC";
