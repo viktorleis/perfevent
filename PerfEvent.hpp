@@ -23,6 +23,8 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
  */
 
+#if defined(__linux__)
+
 #include <chrono>
 #include <cstring>
 #include <iomanip>
@@ -169,3 +171,11 @@ struct PerfEvent {
    }
 
 };
+#else
+#include <ostream>
+struct PerfEvent {
+   void startCounters() {};
+   void stopCounters() {};
+   void printReport(std::ostream& out, uint64_t normalizationConstant) {};
+};
+#endif
