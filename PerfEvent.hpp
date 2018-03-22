@@ -174,8 +174,8 @@ struct PerfEvent {
 #else
 #include <ostream>
 struct PerfEvent {
-   void startCounters() {};
-   void stopCounters() {};
-   void printReport(std::ostream& out, uint64_t normalizationConstant) {};
+   void startCounters() {}
+   void stopCounters() {}
+   void printReport(std::ostream&, uint64_t) {}
 };
 #endif
