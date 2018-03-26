@@ -23,6 +23,8 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
  */
 
+#pragma once
+
 #if defined(__linux__)
 
 #include <chrono>
@@ -171,6 +173,23 @@ struct PerfEvent {
    }
 
 };
+
+struct PerfEventBlock {
+   PerfEvent e;
+   uint64_t scale;
+
+   PerfEventBlock(uint64_t scale=1) : scale(scale) {
+      e.startCounters();
+   }
+
+   ~PerfEventBlock() {
+      e.stopCounters();
+      std::cout << e.getDuration() << "s ";
+      e.printReport(std::cout, scale);
+      std::cout << std::endl;
+   }
+};
+
 #else
 #include <ostream>
 struct PerfEvent {
