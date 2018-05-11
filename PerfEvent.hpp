@@ -184,7 +184,7 @@ struct PerfEventBlock {
 
    ~PerfEventBlock() {
       e.stopCounters();
-      std::cout << e.getDuration() << "s ";
+      std::cout << e.getDuration() << " sec, ";
       e.printReport(std::cout, scale);
       std::cout << std::endl;
    }
