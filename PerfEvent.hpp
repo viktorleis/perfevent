@@ -31,6 +31,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <cstring>
 #include <iomanip>
 #include <iostream>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -153,40 +154,93 @@ struct PerfEvent {
       return -1;
    }
 
-   void printReport(std::ostream& out, uint64_t normalizationConstant) {
-      if (!events.size())
-         return;
-      std::streamsize defaultPrecision = out.precision();
-
-      // print all metrics
-      out << std::fixed << std::setprecision(2);
-      for (unsigned i=0; i<events.size(); i++)
-         out << events[i].readCounter()/normalizationConstant << " " << names[i] << ", ";
-      out << normalizationConstant << " scale";
-
-      // derived metrics
-      out << ", " << getIPC() << " IPC";
-      out << ", " << getCPUs() << " CPUs";
-      out << ", " << getGHz() << " GHz";
-
-      out << std::defaultfloat << std::setprecision(defaultPrecision);
+   static void printCounter(std::ostream& headerOut, std::ostream& dataOut, std::string name, std::string counterValue,bool addComma=true) {
+     auto width=std::max(name.length(),counterValue.length())+1;
+     headerOut << std::setw(width) << name << (addComma ? "," : "") << " ";
+     dataOut << std::setw(width) << counterValue << (addComma ? "," : "") << " ";
    }
 
+   template <typename T>
+   static void printCounter(std::ostream& headerOut, std::ostream& dataOut, std::string name, T counterValue,bool addComma=true) {
+     PerfEvent::printCounter(headerOut,dataOut,name,std::to_string(counterValue),addComma);
+   }
+
+
+   void printReport(std::ostream& headerOut, std::ostream& dataOut, uint64_t normalizationConstant) {
+      if (!events.size())
+         return;
+      std::streamsize defaultPrecision = dataOut.precision();
+
+      // print all metrics
+      dataOut << std::fixed << std::setprecision(2);
+      for (unsigned i=0; i<events.size(); i++) {
+         printCounter(headerOut,dataOut,names[i],events[i].readCounter()/normalizationConstant);
+      }
+
+      printCounter(headerOut,dataOut,"scale",normalizationConstant);
+
+      // derived metrics
+      printCounter(headerOut,dataOut,"IPC",getIPC());
+      printCounter(headerOut,dataOut,"CPUs",getCPUs());
+      printCounter(headerOut,dataOut,"GHz",getGHz(),false);
+
+      dataOut << std::defaultfloat << std::setprecision(defaultPrecision);
+   }
+};
+
+struct BenchmarkParameters {
+
+  void setParam(const std::string& name,const std::string& value) {
+    params[name]=value;
+  }
+
+  void setParam(const std::string& name,const char* value) {
+    params[name]=value;
+  }
+
+  template <typename T>
+  void setParam(const std::string& name,T value) {
+    setParam(name,std::to_string(value));
+  }
+
+  void printParams(std::ostream& header,std::ostream& data) {
+    for (auto& p : params) {
+      PerfEvent::printCounter(header,data,p.first,p.second);
+    }
+  }
+
+  BenchmarkParameters(std::string name="") {
+    if (name.length())
+      setParam("name",name);
+  }
+
+  private:
+  std::map<std::string,std::string> params;
 };
 
 struct PerfEventBlock {
    PerfEvent e;
    uint64_t scale;
+   BenchmarkParameters parameters;
+   bool printHeader;
 
-   PerfEventBlock(uint64_t scale=1) : scale(scale) {
-      e.startCounters();
+   PerfEventBlock(uint64_t scale = 1, BenchmarkParameters params = {}, bool printHeader = true)
+       : scale(scale),
+         parameters(params),
+         printHeader(printHeader) {
+     e.startCounters();
    }
 
    ~PerfEventBlock() {
-      e.stopCounters();
-      std::cout << e.getDuration() << " sec, ";
-      e.printReport(std::cout, scale);
-      std::cout << std::endl;
+     e.stopCounters();
+     std::stringstream header;
+     std::stringstream data;
+     parameters.printParams(header,data);
+     PerfEvent::printCounter(header,data,"time sec",e.getDuration());
+     e.printReport(header, data, scale);
+     if (printHeader)
+       std::cout << header.str() << std::endl;
+     std::cout << data.str() << std::endl;
    }
 };
 
