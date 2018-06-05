@@ -155,7 +155,7 @@ struct PerfEvent {
    }
 
    static void printCounter(std::ostream& headerOut, std::ostream& dataOut, std::string name, std::string counterValue,bool addComma=true) {
-     auto width=std::max(name.length(),counterValue.length())+1;
+     auto width=std::max(name.length(),counterValue.length());
      headerOut << std::setw(width) << name << (addComma ? "," : "") << " ";
      dataOut << std::setw(width) << counterValue << (addComma ? "," : "") << " ";
    }
@@ -165,6 +165,13 @@ struct PerfEvent {
      PerfEvent::printCounter(headerOut,dataOut,name,std::to_string(counterValue),addComma);
    }
 
+   void printReport(std::ostream& out, uint64_t normalizationConstant) {
+     std::stringstream header;
+     std::stringstream data;
+     printReport(header,data,normalizationConstant);
+     out << header.str() << std::endl;
+     out << data.str() << std::endl;
+   }
 
    void printReport(std::ostream& headerOut, std::ostream& dataOut, uint64_t normalizationConstant) {
       if (!events.size())
