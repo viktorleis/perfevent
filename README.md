@@ -1,6 +1,7 @@
-# PerfEvent: A header-only C++ wrapper for Linux' perf event API
+# PerfEvent
+### A header-only C++ wrapper for Linux' perf event API
 
-## Usage of PerfEvent:
+### Basic Usage:
 
 ```
 #include "PerfEvent.hpp"
@@ -20,7 +21,8 @@ cycles, instructions, L1-misses, LLC-misses, branch-misses, task-clock,    scale
  10.97,     28.01,      0.22,       0.00,          0.00,       3.89, 10000000, 2.55, 1.00, 2.82
 ```
 
-## Usage of PerfEventBlock (convenience wrapper):
+### Usage of PerfEventBlock (convenience wrapper):
+
 ```
 #include "PerfEvent.hpp"
 
