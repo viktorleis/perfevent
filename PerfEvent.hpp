@@ -162,7 +162,9 @@ struct PerfEvent {
 
    template <typename T>
    static void printCounter(std::ostream& headerOut, std::ostream& dataOut, std::string name, T counterValue,bool addComma=true) {
-     PerfEvent::printCounter(headerOut,dataOut,name,std::to_string(counterValue),addComma);
+     std::stringstream stream;
+     stream << std::fixed << std::setprecision(2) << counterValue;
+     PerfEvent::printCounter(headerOut,dataOut,name,stream.str(),addComma);
    }
 
    void printReport(std::ostream& out, uint64_t normalizationConstant) {
@@ -176,10 +178,8 @@ struct PerfEvent {
    void printReport(std::ostream& headerOut, std::ostream& dataOut, uint64_t normalizationConstant) {
       if (!events.size())
          return;
-      std::streamsize defaultPrecision = dataOut.precision();
 
       // print all metrics
-      dataOut << std::fixed << std::setprecision(2);
       for (unsigned i=0; i<events.size(); i++) {
          printCounter(headerOut,dataOut,names[i],events[i].readCounter()/normalizationConstant);
       }
@@ -190,8 +190,6 @@ struct PerfEvent {
       printCounter(headerOut,dataOut,"IPC",getIPC());
       printCounter(headerOut,dataOut,"CPUs",getCPUs());
       printCounter(headerOut,dataOut,"GHz",getGHz(),false);
-
-      dataOut << std::defaultfloat << std::setprecision(defaultPrecision);
    }
 };
 
