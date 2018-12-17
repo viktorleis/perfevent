@@ -255,5 +255,14 @@ struct PerfEvent {
    void startCounters() {}
    void stopCounters() {}
    void printReport(std::ostream&, uint64_t) {}
+   template <class T> void setParam(const std::string&, const T&) {};
+};
+
+struct BenchmarkParameters {
+};
+
+struct PerfEventBlock {
+   PerfEventBlock(uint64_t = 1, BenchmarkParameters = {}, bool = true) {};
+   PerfEventBlock(PerfEvent e, uint64_t = 1, BenchmarkParameters = {}, bool = true) {};
 };
 #endif
