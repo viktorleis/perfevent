@@ -55,3 +55,7 @@ Dummy Benchmark,   100 GB,       1, 1.400645, 1075.520519,  1931.465504,  8.8883
 Dummy Benchmark,   100 GB,       2, 1.133364, 2386.772941,  2062.313141, 32.095011,   0.043248,      0.918986, 650.737357, 5000000, 0.864059, 1.870823, 3.667798
 ...
 ```
+
+### Troubleshooting
+
+You may need to run "sudo sysctl -w kernel.perf_event_paranoid=-1" and/or add "kernel.perf_event_paranoid = -1" to /etc/sysctl.conf
