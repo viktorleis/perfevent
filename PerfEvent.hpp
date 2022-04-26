@@ -56,8 +56,8 @@ struct PerfEvent {
       read_format data;
 
       double readCounter() {
-         double multiplexingCorrection = static_cast<double>(data.time_enabled - prev.time_enabled) / (data.time_running - prev.time_running);
-         return (data.value - prev.value) * multiplexingCorrection;
+         double multiplexingCorrection = static_cast<double>(data.time_enabled - prev.time_enabled) / static_cast<double>(data.time_running - prev.time_running);
+         return static_cast<double>(data.value - prev.value) * multiplexingCorrection;
       }
    };
 
@@ -77,7 +77,7 @@ struct PerfEvent {
 
       for (unsigned i=0; i<events.size(); i++) {
          auto& event = events[i];
-         event.fd = syscall(__NR_perf_event_open, &event.pe, 0, -1, -1, 0);
+         event.fd = static_cast<int>(syscall(__NR_perf_event_open, &event.pe, 0, -1, -1, 0));
          if (event.fd < 0) {
             std::cerr << "Error opening counter " << names[i] << std::endl;
             events.resize(0);
@@ -93,7 +93,7 @@ struct PerfEvent {
       auto& event = events.back();
       auto& pe = event.pe;
       memset(&pe, 0, sizeof(struct perf_event_attr));
-      pe.type = type;
+      pe.type = static_cast<uint32_t>(type);
       pe.size = sizeof(struct perf_event_attr);
       pe.config = eventID;
       pe.disabled = true;
@@ -156,8 +156,8 @@ struct PerfEvent {
 
    static void printCounter(std::ostream& headerOut, std::ostream& dataOut, std::string name, std::string counterValue,bool addComma=true) {
      auto width=std::max(name.length(),counterValue.length());
-     headerOut << std::setw(width) << name << (addComma ? "," : "") << " ";
-     dataOut << std::setw(width) << counterValue << (addComma ? "," : "") << " ";
+     headerOut << std::setw(static_cast<int>(width)) << name << (addComma ? "," : "") << " ";
+     dataOut << std::setw(static_cast<int>(width)) << counterValue << (addComma ? "," : "") << " ";
    }
 
    template <typename T>
@@ -181,7 +181,7 @@ struct PerfEvent {
 
       // print all metrics
       for (unsigned i=0; i<events.size(); i++) {
-         printCounter(headerOut,dataOut,names[i],events[i].readCounter()/normalizationConstant);
+         printCounter(headerOut,dataOut,names[i],events[i].readCounter()/static_cast<double>(normalizationConstant));
       }
 
       printCounter(headerOut,dataOut,"scale",normalizationConstant);
