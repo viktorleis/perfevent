@@ -223,8 +223,29 @@ struct BenchmarkParameters {
   std::map<std::string,std::string> params;
 };
 
+struct PerfRef {
+    union {
+      PerfEvent instance;
+      PerfEvent *pointer;
+    };
+    bool has_instance;
+
+    PerfRef() : instance(), has_instance(true) {}
+    PerfRef(PerfEvent *ptr) : pointer(ptr), has_instance(false) {}
+    PerfRef(const PerfRef&) = delete;
+
+    ~PerfRef() {
+      if (has_instance)
+        instance.~PerfEvent();
+    }
+
+    PerfEvent* operator->() {
+        return has_instance ? &instance : pointer;
+    }
+};
+
 struct PerfEventBlock {
-   PerfEvent e;
+   PerfRef e;
    uint64_t scale;
    BenchmarkParameters parameters;
    bool printHeader;
@@ -233,16 +254,24 @@ struct PerfEventBlock {
        : scale(scale),
          parameters(params),
          printHeader(printHeader) {
-     e.startCounters();
+     e->startCounters();
+   }
+
+   PerfEventBlock(PerfEvent& perf, uint64_t scale = 1, BenchmarkParameters params = {}, bool printHeader = true)
+       : e(&perf),
+         scale(scale),
+         parameters(params),
+         printHeader(printHeader) {
+     e->startCounters();
    }
 
    ~PerfEventBlock() {
-     e.stopCounters();
+     e->stopCounters();
      std::stringstream header;
      std::stringstream data;
      parameters.printParams(header,data);
-     PerfEvent::printCounter(header,data,"time sec",e.getDuration());
-     e.printReport(header, data, scale);
+     PerfEvent::printCounter(header,data,"time sec",e->getDuration());
+     e->printReport(header, data, scale);
      if (printHeader)
        std::cout << header.str() << std::endl;
      std::cout << data.str() << std::endl;
