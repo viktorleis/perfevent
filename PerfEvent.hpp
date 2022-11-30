@@ -61,6 +61,8 @@ struct PerfEvent {
       }
    };
 
+   enum EventDomain : uint8_t { USER = 0b1, KERNEL = 0b10, HYPERVISOR = 0b100, ALL = 0b111 };
+
    std::vector<event> events;
    std::vector<std::string> names;
    std::chrono::time_point<std::chrono::steady_clock> startTime;
@@ -68,6 +70,7 @@ struct PerfEvent {
 
    PerfEvent() {
       registerCounter("cycles", PERF_TYPE_HARDWARE, PERF_COUNT_HW_CPU_CYCLES);
+      registerCounter("kcycles", PERF_TYPE_HARDWARE, PERF_COUNT_HW_CPU_CYCLES, KERNEL);
       registerCounter("instructions", PERF_TYPE_HARDWARE, PERF_COUNT_HW_INSTRUCTIONS);
       registerCounter("L1-misses", PERF_TYPE_HW_CACHE, PERF_COUNT_HW_CACHE_L1D|(PERF_COUNT_HW_CACHE_OP_READ<<8)|(PERF_COUNT_HW_CACHE_RESULT_MISS<<16));
       registerCounter("LLC-misses", PERF_TYPE_HARDWARE, PERF_COUNT_HW_CACHE_MISSES);
@@ -87,7 +90,7 @@ struct PerfEvent {
       }
    }
 
-   void registerCounter(const std::string& name, uint64_t type, uint64_t eventID) {
+   void registerCounter(const std::string& name, uint64_t type, uint64_t eventID, EventDomain domain = ALL) {
       names.push_back(name);
       events.push_back(event());
       auto& event = events.back();
@@ -99,8 +102,9 @@ struct PerfEvent {
       pe.disabled = true;
       pe.inherit = 1;
       pe.inherit_stat = 0;
-      pe.exclude_kernel = false;
-      pe.exclude_hv = false;
+      pe.exclude_user = !(domain & USER);
+      pe.exclude_kernel = !(domain & KERNEL);
+      pe.exclude_hv = !(domain & HYPERVISOR);
       pe.read_format = PERF_FORMAT_TOTAL_TIME_ENABLED | PERF_FORMAT_TOTAL_TIME_RUNNING;
    }
 
@@ -223,8 +227,29 @@ struct BenchmarkParameters {
   std::map<std::string,std::string> params;
 };
 
+struct PerfRef {
+    union {
+      PerfEvent instance;
+      PerfEvent *pointer;
+    };
+    bool has_instance;
+
+    PerfRef() : instance(), has_instance(true) {}
+    PerfRef(PerfEvent *ptr) : pointer(ptr), has_instance(false) {}
+    PerfRef(const PerfRef&) = delete;
+
+    ~PerfRef() {
+      if (has_instance)
+        instance.~PerfEvent();
+    }
+
+    PerfEvent* operator->() {
+        return has_instance ? &instance : pointer;
+    }
+};
+
 struct PerfEventBlock {
-   PerfEvent e;
+   PerfRef e;
    uint64_t scale;
    BenchmarkParameters parameters;
    bool printHeader;
@@ -233,16 +258,24 @@ struct PerfEventBlock {
        : scale(scale),
          parameters(params),
          printHeader(printHeader) {
-     e.startCounters();
+     e->startCounters();
+   }
+
+   PerfEventBlock(PerfEvent& perf, uint64_t scale = 1, BenchmarkParameters params = {}, bool printHeader = true)
+       : e(&perf),
+         scale(scale),
+         parameters(params),
+         printHeader(printHeader) {
+     e->startCounters();
    }
 
    ~PerfEventBlock() {
-     e.stopCounters();
+     e->stopCounters();
      std::stringstream header;
      std::stringstream data;
      parameters.printParams(header,data);
-     PerfEvent::printCounter(header,data,"time sec",e.getDuration());
-     e.printReport(header, data, scale);
+     PerfEvent::printCounter(header,data,"time sec",e->getDuration());
+     e->printReport(header, data, scale);
      if (printHeader)
        std::cout << header.str() << std::endl;
      std::cout << data.str() << std::endl;

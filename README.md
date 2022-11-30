@@ -3,7 +3,7 @@
 
 ### Basic Usage:
 
-```
+```c++
 #include "PerfEvent.hpp"
 ...
 PerfEvent e;
@@ -23,7 +23,7 @@ cycles, instructions, L1-misses, LLC-misses, branch-misses, task-clock,    scale
 
 ### Usage of PerfEventBlock (convenience wrapper):
 
-```
+```c++
 #include "PerfEvent.hpp"
 
 // Define some global params
@@ -49,13 +49,25 @@ for (int threads=1;threads<maxThreads;++threads) {
 ```
 
 This prints something like this:
-```
+```csv
            name, dataSize, threads, time sec,      cycles, instructions, L1-misses, LLC-misses, branch-misses, task-clock,   scale,      IPC,     CPUs,      GHz
 Dummy Benchmark,   100 GB,       1, 1.400645, 1075.520519,  1931.465504,  8.888315,   0.070063,      0.121389, 280.115649, 5000000, 1.795843, 0.999952, 3.839559
 Dummy Benchmark,   100 GB,       2, 1.133364, 2386.772941,  2062.313141, 32.095011,   0.043248,      0.918986, 650.737357, 5000000, 0.864059, 1.870823, 3.667798
 ...
 ```
 
+Sometimes the measured counters differ depending on when you construct `PerfEvent`, for example before vs. after starting threads.
+You can control this by passing an existing `PerfEvent` instance to `PerfEventBlock`:
+
+``` c++
+PerfEvent perfevent;
+// start threads etc.
+{
+  PerfEventBlock perf(perfevent);
+  yourBenchmark();
+}
+```
+
 ### Troubleshooting
 
-You may need to run "sudo sysctl -w kernel.perf_event_paranoid=-1" and/or add "kernel.perf_event_paranoid = -1" to /etc/sysctl.conf
+You may need to run `sudo sysctl -w kernel.perf_event_paranoid=-1` and/or add `kernel.perf_event_paranoid = -1` to `/etc/sysctl.conf`
