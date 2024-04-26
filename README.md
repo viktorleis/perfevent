@@ -20,6 +20,7 @@ This prints something like this:
 cycles, instructions, L1-misses, LLC-misses, branch-misses, task-clock,    scale, IPC, CPUs,  GHz
  10.97,     28.01,      0.22,       0.00,          0.00,       3.89, 10000000, 2.55, 1.00, 2.82
 ```
+To print the output vertically, use the function `printReportVertical`.
 
 ### Usage of PerfEventBlock (convenience wrapper):
 
