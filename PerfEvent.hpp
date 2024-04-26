@@ -159,14 +159,14 @@ struct PerfEvent {
       return -1;
    }
 
-   static void printCounter(std::ostream& headerOut, std::ostream& dataOut, std::string name, std::string counterValue,bool addComma=true) {
+   static void printCounter(std::ostream& headerOut, std::ostream& dataOut, std::string name, std::string counterValue, bool addComma=true) {
      auto width=std::max(name.length(),counterValue.length());
      headerOut << std::setw(static_cast<int>(width)) << name << (addComma ? "," : "") << " ";
      dataOut << std::setw(static_cast<int>(width)) << counterValue << (addComma ? "," : "") << " ";
    }
 
    template <typename T>
-   static void printCounter(std::ostream& headerOut, std::ostream& dataOut, std::string name, T counterValue,bool addComma=true) {
+   static void printCounter(std::ostream& headerOut, std::ostream& dataOut, std::string name, T counterValue, bool addComma=true) {
      std::stringstream stream;
      stream << std::fixed << std::setprecision(2) << counterValue;
      PerfEvent::printCounter(headerOut,dataOut,name,stream.str(),addComma);
@@ -195,6 +195,46 @@ struct PerfEvent {
       printCounter(headerOut,dataOut,"IPC",getIPC());
       printCounter(headerOut,dataOut,"CPUs",getCPUs());
       printCounter(headerOut,dataOut,"GHz",getGHz(),false);
+   }
+
+   static void printCounterVertical(std::ostream& infoOut, std::string name, std::string counterValue, int eNameWidth) {
+     infoOut << std::setw(eNameWidth) << std::left << name << " : " << counterValue << std::endl;
+   }
+
+   template <typename T>
+   static void printCounterVertical(std::ostream& infoOut, std::string name, T counterValue, int eNameWidth) {
+     std::stringstream stream;
+     stream << std::fixed << std::setprecision(2) << counterValue;
+     PerfEvent::printCounterVertical(infoOut,name,stream.str(),eNameWidth);
+   }
+
+   void printReportVertical(std::ostream& out, uint64_t normalizationConstant) {
+     std::stringstream info;
+     printReportVerticalUtil(info,normalizationConstant);
+     out << info.str() << std::endl;
+   }
+
+   void printReportVerticalUtil(std::ostream& infoOut, uint64_t normalizationConstant) {
+      if (!events.size())
+         return;
+
+      // get width of the widest event name. Minimum width is the one of 'scale'
+      int eNameWidth=5;
+      for (unsigned i=0; i<events.size(); i++) {
+         eNameWidth=std::max(static_cast<int>(names[i].length()),eNameWidth);
+      }
+
+      // print all metrics
+      for (unsigned i=0; i<events.size(); i++) {
+         printCounterVertical(infoOut,names[i],events[i].readCounter()/static_cast<double>(normalizationConstant),eNameWidth);
+      }
+
+      printCounterVertical(infoOut,"scale",normalizationConstant,eNameWidth);
+
+      // derived metrics
+      printCounterVertical(infoOut,"IPC",getIPC(),eNameWidth);
+      printCounterVertical(infoOut,"CPUs",getCPUs(),eNameWidth);
+      printCounterVertical(infoOut,"GHz",getGHz(),eNameWidth);
    }
 };
 
