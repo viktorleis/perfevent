@@ -159,25 +159,25 @@ struct PerfEvent {
       return -1;
    }
 
-   static void printCounter(std::ostream& headerOut, std::ostream& dataOut, std::string name, std::string counterValue,bool addComma=true) {
-     auto width=std::max(name.length(),counterValue.length());
-     headerOut << std::setw(static_cast<int>(width)) << name << (addComma ? "," : "") << " ";
-     dataOut << std::setw(static_cast<int>(width)) << counterValue << (addComma ? "," : "") << " ";
+   static void printCounter(std::ostream& headerOut, std::ostream& dataOut, std::string name, std::string counterValue, bool addComma=true) {
+      auto width=std::max(name.length(),counterValue.length());
+      headerOut << std::setw(static_cast<int>(width)) << name << (addComma ? "," : "") << " ";
+      dataOut << std::setw(static_cast<int>(width)) << counterValue << (addComma ? "," : "") << " ";
    }
 
    template <typename T>
-   static void printCounter(std::ostream& headerOut, std::ostream& dataOut, std::string name, T counterValue,bool addComma=true) {
-     std::stringstream stream;
-     stream << std::fixed << std::setprecision(2) << counterValue;
-     PerfEvent::printCounter(headerOut,dataOut,name,stream.str(),addComma);
+   static void printCounter(std::ostream& headerOut, std::ostream& dataOut, std::string name, T counterValue, bool addComma=true) {
+      std::stringstream stream;
+      stream << std::fixed << std::setprecision(2) << counterValue;
+      PerfEvent::printCounter(headerOut,dataOut,name,stream.str(),addComma);
    }
 
    void printReport(std::ostream& out, uint64_t normalizationConstant) {
-     std::stringstream header;
-     std::stringstream data;
-     printReport(header,data,normalizationConstant);
-     out << header.str() << std::endl;
-     out << data.str() << std::endl;
+      std::stringstream header;
+      std::stringstream data;
+      printReport(header,data,normalizationConstant);
+      out << header.str() << std::endl;
+      out << data.str() << std::endl;
    }
 
    void printReport(std::ostream& headerOut, std::ostream& dataOut, uint64_t normalizationConstant) {
@@ -196,57 +196,93 @@ struct PerfEvent {
       printCounter(headerOut,dataOut,"CPUs",getCPUs());
       printCounter(headerOut,dataOut,"GHz",getGHz(),false);
    }
+
+   template <typename T>
+   static void printCounterVertical(std::ostream& infoOut, std::string name, T counterValue, int eNameWidth) {
+      std::stringstream stream;
+      stream << std::fixed << std::setprecision(2) << counterValue;
+      infoOut << std::setw(eNameWidth) << std::left << name << " : " << stream.str() << std::endl;
+   }
+
+   void printReportVertical(std::ostream& out, uint64_t normalizationConstant) {
+      std::stringstream info;
+      printReportVerticalUtil(info,normalizationConstant);
+      out << info.str() << std::endl;
+   }
+
+   void printReportVerticalUtil(std::ostream& infoOut, uint64_t normalizationConstant) {
+      if (!events.size())
+         return;
+
+      // get width of the widest event name. Minimum width is the one of 'scale'
+      int eNameWidth=5;
+      for (unsigned i=0; i<events.size(); i++) {
+         eNameWidth=std::max(static_cast<int>(names[i].length()),eNameWidth);
+      }
+
+      // print all metrics
+      for (unsigned i=0; i<events.size(); i++) {
+         printCounterVertical(infoOut,names[i],events[i].readCounter()/static_cast<double>(normalizationConstant),eNameWidth);
+      }
+
+      printCounterVertical(infoOut,"scale",normalizationConstant,eNameWidth);
+
+      // derived metrics
+      printCounterVertical(infoOut,"IPC",getIPC(),eNameWidth);
+      printCounterVertical(infoOut,"CPUs",getCPUs(),eNameWidth);
+      printCounterVertical(infoOut,"GHz",getGHz(),eNameWidth);
+   }
 };
 
 struct BenchmarkParameters {
 
-  void setParam(const std::string& name,const std::string& value) {
-    params[name]=value;
-  }
+   void setParam(const std::string& name,const std::string& value) {
+      params[name]=value;
+   }
 
-  void setParam(const std::string& name,const char* value) {
-    params[name]=value;
-  }
+   void setParam(const std::string& name,const char* value) {
+      params[name]=value;
+   }
 
-  template <typename T>
-  void setParam(const std::string& name,T value) {
-    setParam(name,std::to_string(value));
-  }
+   template <typename T>
+   void setParam(const std::string& name,T value) {
+      setParam(name,std::to_string(value));
+   }
 
-  void printParams(std::ostream& header,std::ostream& data) {
-    for (auto& p : params) {
-      PerfEvent::printCounter(header,data,p.first,p.second);
-    }
-  }
+   void printParams(std::ostream& header,std::ostream& data) {
+      for (auto& p : params) {
+         PerfEvent::printCounter(header,data,p.first,p.second);
+      }
+   }
 
-  BenchmarkParameters(std::string name="") {
-    if (name.length())
-      setParam("name",name);
-  }
+   BenchmarkParameters(std::string name="") {
+      if (name.length())
+         setParam("name",name);
+   }
 
-  private:
-  std::map<std::string,std::string> params;
+   private:
+   std::map<std::string,std::string> params;
 };
 
 struct PerfRef {
-    union {
+   union {
       PerfEvent instance;
       PerfEvent *pointer;
-    };
-    bool has_instance;
+   };
+   bool has_instance;
 
-    PerfRef() : instance(), has_instance(true) {}
-    PerfRef(PerfEvent *ptr) : pointer(ptr), has_instance(false) {}
-    PerfRef(const PerfRef&) = delete;
+   PerfRef() : instance(), has_instance(true) {}
+   PerfRef(PerfEvent *ptr) : pointer(ptr), has_instance(false) {}
+   PerfRef(const PerfRef&) = delete;
 
-    ~PerfRef() {
+   ~PerfRef() {
       if (has_instance)
-        instance.~PerfEvent();
-    }
+      instance.~PerfEvent();
+   }
 
-    PerfEvent* operator->() {
-        return has_instance ? &instance : pointer;
-    }
+   PerfEvent* operator->() {
+      return has_instance ? &instance : pointer;
+   }
 };
 
 struct PerfEventBlock {
@@ -271,15 +307,15 @@ struct PerfEventBlock {
    }
 
    ~PerfEventBlock() {
-     e->stopCounters();
-     std::stringstream header;
-     std::stringstream data;
-     parameters.printParams(header,data);
-     PerfEvent::printCounter(header,data,"time sec",e->getDuration());
-     e->printReport(header, data, scale);
-     if (printHeader)
-       std::cout << header.str() << std::endl;
-     std::cout << data.str() << std::endl;
+      e->stopCounters();
+      std::stringstream header;
+      std::stringstream data;
+      parameters.printParams(header,data);
+      PerfEvent::printCounter(header,data,"time sec",e->getDuration());
+      e->printReport(header, data, scale);
+      if (printHeader)
+         std::cout << header.str() << std::endl;
+      std::cout << data.str() << std::endl;
    }
 };
 
