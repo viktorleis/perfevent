@@ -1,6 +1,10 @@
 # PerfEvent
 ### A header-only C++ wrapper for Linux' perf event API
 
+### Configuration
+
+You may need to run `sudo sysctl -w kernel.perf_event_paranoid=-1`. Add `kernel.perf_event_paranoid = -1` to `/etc/sysctl.conf` to make the setting survive a reboot.
+
 ### Basic Usage:
 
 ```c++
@@ -68,7 +72,3 @@ PerfEvent perfevent;
   yourBenchmark();
 }
 ```
-
-### Troubleshooting
-
-You may need to run `sudo sysctl -w kernel.perf_event_paranoid=-1` and/or add `kernel.perf_event_paranoid = -1` to `/etc/sysctl.conf`
