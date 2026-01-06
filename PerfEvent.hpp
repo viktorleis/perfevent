@@ -193,7 +193,7 @@ struct PerfEvent {
       return -1;
    }
 
-   static void printCounter(std::ostream& headerOut, std::ostream& dataOut, std::string name, std::string counterValue,bool addComma=true) {
+   static void printCounter(std::ostream& headerOut, std::ostream& dataOut, std::string name, std::string counterValue, bool addComma=true) {
       unsigned width = name.length();
       if (counterValue.length() > width)
          width = counterValue.length();
@@ -201,10 +201,9 @@ struct PerfEvent {
       dataOut << std::setw(width) << counterValue << (addComma ? "," : "") << " ";
    }
 
-   template <typename T>
-   static void printCounter(std::ostream& headerOut, std::ostream& dataOut, std::string name, T counterValue,bool addComma=true) {
+   static void printCounter(std::ostream& headerOut, std::ostream& dataOut, std::string name, double counterValue, bool addComma=true) {
       std::stringstream stream;
-      stream << std::fixed << std::setprecision(2) << counterValue;
+      stream << std::fixed << std::setprecision(counterValue >= 100 ? 0 : 2) << counterValue;
       PerfEvent::printCounter(headerOut,dataOut,name,stream.str(),addComma);
    }
 
@@ -221,9 +220,9 @@ struct PerfEvent {
          return;
 
       // print all metrics
-      for (auto& event: events) {
-         printCounter(headerOut, dataOut, event.name, event.readCounter()/scale);
-      }
+      for (auto& event: events)
+         if (event.name != "task") // getCPUs() is enough
+            printCounter(headerOut, dataOut, event.name, event.readCounter()/scale);
 
       printCounter(headerOut, dataOut, "scale", scale);
 
