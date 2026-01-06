@@ -204,7 +204,7 @@ struct PerfEvent {
    template <typename T>
    static void printCounter(std::ostream& headerOut, std::ostream& dataOut, std::string name, T counterValue,bool addComma=true) {
       std::stringstream stream;
-      stream << std::fixed << std::setprecision(3) << counterValue;
+      stream << std::fixed << std::setprecision(2) << counterValue;
       PerfEvent::printCounter(headerOut,dataOut,name,stream.str(),addComma);
    }
 
