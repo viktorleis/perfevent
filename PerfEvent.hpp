@@ -76,7 +76,7 @@ struct PerfEvent {
       registerCounter("kcycle", PERF_TYPE_HARDWARE, PERF_COUNT_HW_CPU_CYCLES, true); // cycles in kernel
       registerCounter("instr", PERF_TYPE_HARDWARE, PERF_COUNT_HW_INSTRUCTIONS);
       registerCounter("L1-miss", PERF_TYPE_HW_CACHE, PERF_COUNT_HW_CACHE_L1D|(PERF_COUNT_HW_CACHE_OP_READ<<8)|(PERF_COUNT_HW_CACHE_RESULT_MISS<<16));
-      registerCounter("c-miss", PERF_TYPE_HARDWARE, PERF_COUNT_HW_CACHE_MISSES);
+      //registerCounter("c-miss", PERF_TYPE_HARDWARE, PERF_COUNT_HW_CACHE_MISSES); // L2 misses on most recent CPUs
       registerCounter("br-miss", PERF_TYPE_HARDWARE, PERF_COUNT_HW_BRANCH_MISSES);
       registerCounter("task", PERF_TYPE_SOFTWARE, PERF_COUNT_SW_TASK_CLOCK);
 
