@@ -64,6 +64,7 @@ struct PerfEvent {
    };
 
    std::vector<event> events;
+   bool hasAmdL3 = false;
    std::chrono::time_point<std::chrono::steady_clock> startTime;
    std::chrono::time_point<std::chrono::steady_clock> stopTime;
    std::vector<std::string> extraParamsKeys;
@@ -76,7 +77,7 @@ struct PerfEvent {
       registerCounter("kcycle", PERF_TYPE_HARDWARE, PERF_COUNT_HW_CPU_CYCLES, true); // cycles in kernel
       registerCounter("instr", PERF_TYPE_HARDWARE, PERF_COUNT_HW_INSTRUCTIONS);
       registerCounter("L1-miss", PERF_TYPE_HW_CACHE, PERF_COUNT_HW_CACHE_L1D|(PERF_COUNT_HW_CACHE_OP_READ<<8)|(PERF_COUNT_HW_CACHE_RESULT_MISS<<16));
-      //registerCounter("c-miss", PERF_TYPE_HARDWARE, PERF_COUNT_HW_CACHE_MISSES); // L2 misses on most recent CPUs
+      registerCounter("c-miss", PERF_TYPE_HARDWARE, PERF_COUNT_HW_CACHE_MISSES); // L2 misses on AMD
       registerCounter("br-miss", PERF_TYPE_HARDWARE, PERF_COUNT_HW_BRANCH_MISSES);
       registerCounter("task", PERF_TYPE_SOFTWARE, PERF_COUNT_SW_TASK_CLOCK);
 
@@ -86,11 +87,17 @@ struct PerfEvent {
       // AMD uncore counters: https://git.zx2c4.com/linux-rng/commit/tools?id=5b2ca349c313a0e03162e353d898c4f7046c7898
       std::vector<int> type = readFile("/sys/bus/event_source/devices/amd_l3/type");
       if (type.size()==1) {
+         hasAmdL3 = true;
          for (int cpuMask : readFile("/sys/bus/event_source/devices/amd_l3/cpumask")) {
-            uint64_t eventID = 0x104; // L3 cache miss on AMD Zen
-            registerCounter("L3-miss" + std::to_string(cpuMask), type[0], eventID);
-            auto& event = events.back();
-            event.fd = syscall(__NR_perf_event_open, &event.pe, -1, cpuMask, -1, 0);
+            std::string suffix = std::to_string(cpuMask);
+            registerCounter("L3-miss" + suffix, type[0], 0x104); // L3 cache miss
+            events.back().fd = syscall(__NR_perf_event_open, &events.back().pe, -1, cpuMask, -1, 0);
+            // enallcores=1 (bit 47), enallslices=1 (bit 46), sliceid=0x3 (bits 48-50), threadmask=0x3 (bits 56-57)
+            constexpr uint64_t allFlags = (0x3ULL << 56) | (0x3ULL << 48) | (1ULL << 47) | (1ULL << 46);
+            registerCounter("DRAM-latc" + suffix, type[0], allFlags | 0x01ac); // l3_xi_sampled_latency (cycles)
+            events.back().fd = syscall(__NR_perf_event_open, &events.back().pe, -1, cpuMask, -1, 0);
+            registerCounter("DRAM-latr" + suffix, type[0], allFlags | 0x01ad); // l3_xi_sampled_latency_requests
+            events.back().fd = syscall(__NR_perf_event_open, &events.back().pe, -1, cpuMask, -1, 0);
          }
       }
 
@@ -101,7 +108,7 @@ struct PerfEvent {
             for (auto& event: events)
                if (event.fd >= 0)
                   close(event.fd);
-            events.resize(0);
+            events.clear();
             return;
          }
       }
@@ -193,7 +200,19 @@ struct PerfEvent {
       return -1;
    }
 
-   static void printCounter(std::ostream& headerOut, std::ostream& dataOut, std::string name, std::string counterValue, bool addComma=true) {
+   static bool startsWith(const std::string& s, const std::string& prefix) {
+      return s.compare(0, prefix.size(), prefix) == 0;
+   }
+
+   double sumCounters(const std::string& prefix) {
+      double sum = 0;
+      for (auto& event: events)
+         if (startsWith(event.name, prefix))
+            sum += event.readCounter();
+      return sum;
+   }
+
+   static void printCounter(std::ostream& headerOut, std::ostream& dataOut, const std::string& name, const std::string& counterValue, bool addComma=true) {
       unsigned width = name.length();
       if (counterValue.length() > width)
          width = counterValue.length();
@@ -201,7 +220,7 @@ struct PerfEvent {
       dataOut << std::setw(width) << counterValue << (addComma ? "," : "") << " ";
    }
 
-   static void printCounter(std::ostream& headerOut, std::ostream& dataOut, std::string name, double counterValue, bool addComma=true) {
+   static void printCounter(std::ostream& headerOut, std::ostream& dataOut, const std::string& name, double counterValue, bool addComma=true) {
       std::stringstream stream;
       stream << std::fixed << std::setprecision(counterValue >= 100 ? 0 : 2) << counterValue;
       PerfEvent::printCounter(headerOut,dataOut,name,stream.str(),addComma);
@@ -219,10 +238,18 @@ struct PerfEvent {
       if (events.empty())
          return;
 
-      // print all metrics
+      // print all metrics (skip per-CPU L3 events and task)
       for (auto& event: events)
-         if (event.name != "task") // getCPUs() is enough
+         if (event.name != "task" && !startsWith(event.name, "L3-") && !startsWith(event.name, "DRAM-"))
             printCounter(headerOut, dataOut, event.name, event.readCounter()/scale);
+
+      // aggregated AMD L3 metrics
+      if (hasAmdL3) {
+         printCounter(headerOut, dataOut, "L3-miss", sumCounters("L3-miss")/scale);
+         double latSum = sumCounters("DRAM-latc");
+         double reqSum = sumCounters("DRAM-latr");
+         printCounter(headerOut, dataOut, "DRAM-lat", reqSum > 0 ? latSum * 10 / reqSum : 0);
+      }
 
       printCounter(headerOut, dataOut, "scale", scale);
 
