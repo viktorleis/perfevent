@@ -65,6 +65,7 @@ struct PerfEvent {
 
    std::vector<event> events;
    bool hasAmdL3 = false;
+   bool hasAmdUmc = false;
    std::chrono::time_point<std::chrono::steady_clock> startTime;
    std::chrono::time_point<std::chrono::steady_clock> stopTime;
    std::vector<std::string> extraParamsKeys;
@@ -84,7 +85,7 @@ struct PerfEvent {
       for (auto& event: events)
          event.fd = syscall(__NR_perf_event_open, &event.pe, 0, -1, -1, 0);
 
-      // AMD uncore counters: https://git.zx2c4.com/linux-rng/commit/tools?id=5b2ca349c313a0e03162e353d898c4f7046c7898
+      // AMD uncore counters from Processor Programming Reference (PPR)
       std::vector<int> type = readFile("/sys/bus/event_source/devices/amd_l3/type");
       if (type.size()==1) {
          hasAmdL3 = true;
@@ -97,6 +98,23 @@ struct PerfEvent {
             registerCounter("DRAM-latc" + suffix, type[0], allFlags | 0x01ac); // l3_xi_sampled_latency (cycles)
             events.back().fd = syscall(__NR_perf_event_open, &events.back().pe, -1, cpuMask, -1, 0);
             registerCounter("DRAM-latr" + suffix, type[0], allFlags | 0x01ad); // l3_xi_sampled_latency_requests
+            events.back().fd = syscall(__NR_perf_event_open, &events.back().pe, -1, cpuMask, -1, 0);
+         }
+      }
+
+      // AMD UMC (memory controller) counters for DRAM read/write bandwidth
+      // CAS command counter (event 0xA): each count = one 64B cache line transfer
+      // rdwrmask: 0x1 = reads only, 0x2 = writes only
+      for (unsigned i = 0; ; i++) {
+         std::string dev = "/sys/bus/event_source/devices/amd_umc_" + std::to_string(i);
+         std::vector<int> umcType = readFile(dev + "/type");
+         if (umcType.size() != 1) break;
+         hasAmdUmc = true;
+         for (int cpuMask : readFile(dev + "/cpumask")) {
+            std::string suffix = std::to_string(i);
+            registerCounter("UMC-rd" + suffix, umcType[0], 0x0a | (0x1 << 8)); // CAS reads
+            events.back().fd = syscall(__NR_perf_event_open, &events.back().pe, -1, cpuMask, -1, 0);
+            registerCounter("UMC-wr" + suffix, umcType[0], 0x0a | (0x2 << 8)); // CAS writes
             events.back().fd = syscall(__NR_perf_event_open, &events.back().pe, -1, cpuMask, -1, 0);
          }
       }
@@ -240,7 +258,7 @@ struct PerfEvent {
 
       // print all metrics (skip per-CPU L3 events and task)
       for (auto& event: events)
-         if (event.name != "task" && !startsWith(event.name, "L3-") && !startsWith(event.name, "DRAM-"))
+         if (event.name != "task" && !startsWith(event.name, "L3-") && !startsWith(event.name, "DRAM-") && !startsWith(event.name, "UMC-"))
             printCounter(headerOut, dataOut, event.name, event.readCounter()/scale);
 
       // aggregated AMD L3 metrics
@@ -249,6 +267,13 @@ struct PerfEvent {
          double latSum = sumCounters("DRAM-latc");
          double reqSum = sumCounters("DRAM-latr");
          printCounter(headerOut, dataOut, "DRAM-lat", reqSum > 0 ? latSum * 10 / reqSum : 0);
+      }
+
+      // aggregated AMD UMC bandwidth (GB/s, system-wide)
+      if (hasAmdUmc) {
+         double seconds = getDuration();
+         printCounter(headerOut, dataOut, "rd-GB/s", sumCounters("UMC-rd") * 64 / seconds / 1e9);
+         printCounter(headerOut, dataOut, "wr-GB/s", sumCounters("UMC-wr") * 64 / seconds / 1e9);
       }
 
       printCounter(headerOut, dataOut, "scale", scale);
